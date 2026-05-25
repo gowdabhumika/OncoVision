@@ -1,0 +1,49 @@
+import streamlit as st
+
+from PIL import Image
+
+import requests
+
+# Title
+st.title("AI Cancer Detection Screenshot Upload")
+
+# Upload Screenshot / Medical Image
+uploaded_file = st.file_uploader(
+    "Upload Screenshot or Medical Image",
+    type=["png", "jpg", "jpeg"]
+)
+
+# If file uploaded
+if uploaded_file is not None:
+
+    # Open image
+    image = Image.open(uploaded_file)
+
+    # Display image
+    st.image(
+        image,
+        caption="Uploaded Image",
+        use_column_width=True
+    )
+
+    # Predict button
+    if st.button("Analyze Image"):
+
+        # Send image to backend
+        response = requests.post(
+            "http://127.0.0.1:5000/predict",
+            files={
+                "image": uploaded_file
+            }
+        )
+
+        # Get prediction result
+        result = response.json()
+
+        st.subheader("Prediction Result")
+
+        st.success(result["result"])
+
+        st.write(
+            f"Confidence: {result['confidence'] * 100:.2f}%"
+        )
