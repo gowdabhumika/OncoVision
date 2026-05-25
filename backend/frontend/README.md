@@ -1,99 +1,54 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import streamlit as st
 
-import os
-import numpy as np
+import requests
 
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
+from PIL import Image
 
-# Flask App
-app = Flask(__name__)
+# Page Title
+st.title("AI-Based Early Cancer Detection")
 
-# Enable CORS
-CORS(app)
+st.write(
+    "Upload MRI / CT Scan / X-ray Image"
+)
 
-# Upload Folder
-UPLOAD_FOLDER = 'uploads'
+# Upload Image
+uploaded_file = st.file_uploader(
+    "Choose Medical Image",
+    type=["jpg", "png", "jpeg"]
+)
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# Show Uploaded Image
+if uploaded_file is not None:
 
-# Load Trained AI Model
-model = load_model('saved_model/cancer_model.h5')
+    image = Image.open(uploaded_file)
 
-
-# Home Route
-@app.route('/')
-def home():
-
-    return "AI Cancer Detection Backend Running"
-
-
-# Prediction Route
-@app.route('/predict', methods=['POST'])
-def predict():
-
-    # Check image uploaded
-    if 'image' not in request.files:
-
-        return jsonify({
-            'error': 'No image uploaded'
-        })
-
-    file = request.files['image']
-
-    # Save uploaded image
-    filepath = os.path.join(
-        UPLOAD_FOLDER,
-        file.filename
+    st.image(
+        image,
+        caption="Uploaded Image",
+        use_column_width=True
     )
 
-    file.save(filepath)
+    # Detect Button
+    if st.button("Detect Cancer"):
 
-    # Load image
-    img = image.load_img(
-        filepath,
-        target_size=(224, 224)
-    )
-
-    # Convert image to array
-    img_array = image.img_to_array(img)
-
-    # Expand dimensions
-    img_array = np.expand_dims(
-        img_array,
-        axis=0
-    )
-
-    # Normalize image
-    img_array = img_array / 255.0
-
-    # AI Prediction
-    prediction = model.predict(img_array)[0][0]
-
-    # Generate Result
-    if prediction > 0.5:
-
-        result = {
-            'result': 'Cancer Detected',
-            'confidence': float(prediction)
+        # Send Image to Flask Backend
+        files = {
+            'image': uploaded_file.getvalue()
         }
 
-    else:
+        response = requests.post(
+            'http://127.0.0.1:5000/predict',
+            files={
+                'image': uploaded_file
+            }
+        )
 
-        result = {
-            'result': 'No Cancer Detected',
-            'confidence': float(1 - prediction)
-        }
+        result = response.json()
 
-    return jsonify(result)
+        st.subheader("Prediction Result")
 
+        st.success(result['result'])
 
-# Run Flask Server
-if __name__ == '__main__':
-
-    app.run(
-        debug=True,
-        host='0.0.0.0',
-        port=5000
-    )
+        st.write(
+            f"Confidence: {result['confidence'] * 100:.2f}%"
+        )
